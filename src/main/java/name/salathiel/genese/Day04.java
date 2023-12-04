@@ -1,6 +1,7 @@
 package name.salathiel.genese;
 
 import java.util.Scanner;
+import java.util.TreeMap;
 
 import static java.lang.Integer.parseInt;
 import static java.util.Arrays.stream;
@@ -11,23 +12,38 @@ import static java.util.stream.IntStream.of;
 
 public class Day04 {
     public static void main(String[] args) {
-        var sum = 0;
+//        var sum = 0;
+        var count = 0;
         final var loader = Day04.class.getClassLoader();
+        final var wins = new TreeMap<Integer, Integer>(Integer::compareTo);
 
         try (final var scanner = new Scanner(requireNonNull(loader.getResourceAsStream("day-04-input.txt")))) {
             while (scanner.hasNext()) {
-                sum += Card.from(scanner.nextLine()).worth();
+//                sum += Card.from(scanner.nextLine()).worth();
+                final var card = Card.from(scanner.nextLine());
+                wins.put(card.id, 1 + wins.getOrDefault(card.id, 0));
+                while (0 < wins.get(card.id)) {
+                    for (int i = 0, id = card.id, l = card.winsCount(), __ = wins.put(id, wins.get(id) - 1); i < l; i++) {
+                        wins.put(id + i + 1, 1 + wins.getOrDefault(id + i + 1, 0));
+                    }
+                    ++count;
+                }
             }
         }
 
-        System.out.println(sum);
+//        System.out.println(sum);
+        System.out.println(count);
     }
 
     record Card(int id, int[] winning, int[] haves) {
         public int worth() {
+            final var count = winsCount();
+            return count < 2 ? count : 2 << (count - 2);
+        }
+
+        private int winsCount() {
             final var winning = of(this.winning).boxed().collect(toMap(identity(), identity()));
-            final var count = (int) of(this.haves).filter(winning::containsKey).count();
-            return count < 2 ? count : 2 << (count-2);
+            return (int) of(this.haves).filter(winning::containsKey).count();
         }
 
         @Override
