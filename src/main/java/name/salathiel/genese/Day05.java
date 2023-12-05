@@ -2,17 +2,21 @@ package name.salathiel.genese;
 
 import java.math.BigInteger;
 import java.util.Scanner;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static java.math.BigInteger.ONE;
+import static java.math.BigInteger.ZERO;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Stream.iterate;
 
 public class Day05 {
     public static void main(String[] args) {
         TreeSet<Mapping> anchor = null;
-        final var seeds = new TreeSet<>(BigInteger::compareTo);
+//        final var seeds = new TreeSet<>(BigInteger::compareTo);
         final var loader = Day05.class.getClassLoader();
         final var seedToSoil = new TreeSet<>(comparing(Mapping::source));
         final var waterToLight = new TreeSet<>(comparing(Mapping::source));
@@ -21,15 +25,20 @@ public class Day05 {
         final var humidityToLocation = new TreeSet<>(comparing(Mapping::source));
         final var lightToTemperature = new TreeSet<>(comparing(Mapping::source));
         final var temperatureToHumidity = new TreeSet<>(comparing(Mapping::source));
+        final var seeds = new TreeMap<BigInteger, BigInteger>(BigInteger::compareTo);
         try (final var scanner = new Scanner(requireNonNull(loader.getResourceAsStream("day-05-input.txt")))) {
             while (scanner.hasNext()) {
                 final var next = scanner.nextLine();
                 if (next.isBlank()) {
                     anchor = null;
                 } else if (next.startsWith("seeds:")) {
-                    Stream.of(next.split(": ")[1].split(" "))
+                    final var chunks = Stream.of(next.split(": ")[1].split(" "))
                             .map(BigInteger::new)
-                            .forEach(seeds::add);
+                            .toArray(BigInteger[]::new);
+
+                    for (int i = 0, l = chunks.length; i < l; i += 2) {
+                        seeds.put(chunks[i], chunks[i + 1]);
+                    }
                 } else if (next.startsWith("seed-to-soil map:")) {
                     anchor = seedToSoil;
                 } else if (next.startsWith("soil-to-fertilizer map:")) {
@@ -50,7 +59,19 @@ public class Day05 {
             }
         }
 
-        seeds.stream()
+//        seeds.stream()
+
+        final var min = new AtomicReference<>(BigInteger.valueOf(Long.MAX_VALUE));
+        seeds.entrySet()
+                .stream()
+                .parallel()
+                .flatMap(entry -> {
+                    final var left = entry.getKey();
+                    final var right = left.add(entry.getValue());
+
+                    return iterate(left, __ -> __.compareTo(right) < 0, __ -> __.add(ONE)).parallel();
+                })
+
                 .map(__ -> resolve(seedToSoil, __).translate(__))
                 .map(__ -> resolve(soilToFertilizer, __).translate(__))
                 .map(__ -> resolve(fertilizerToWater, __).translate(__))
@@ -58,9 +79,10 @@ public class Day05 {
                 .map(__ -> resolve(lightToTemperature, __).translate(__))
                 .map(__ -> resolve(temperatureToHumidity, __).translate(__))
                 .map(__ -> resolve(humidityToLocation, __).translate(__))
-                .sorted()
-                .findFirst()
-                .ifPresent(System.out::println);
+                .filter(__ -> __.compareTo(min.get()) < 0)
+                .forEach(min::set);
+
+        System.out.println(min);
 
 //        System.out.println("SEEDS: " + seeds);
 //        System.out.println("SEEDS TO SOIL: " + seedToSoil);
